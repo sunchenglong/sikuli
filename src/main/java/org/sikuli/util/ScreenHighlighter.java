@@ -170,14 +170,14 @@ public class ScreenHighlighter extends OverlayTransparentWindow implements Mouse
     setVisible(false);
   }
 
-  public void highlight(Region r_) {
+  public void highlight(Region Region) {
     if (Settings.isLinux()) {
       Debug.error("highlight does not work on Linux.");
       return;
     }
     _borderOnly = true;
     Region r;
-    r = r_.grow(3);
+    r = Region.grow(3);
     if (!_native_transparent) {
       captureScreen(r.x, r.y, r.w, r.h);
     }

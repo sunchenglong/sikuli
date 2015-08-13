@@ -2221,6 +2221,52 @@ public class Region {
       }
     }
   }
+  /**
+   * finds the given Pattern, String or Image in the region and returns the best match. If AutoWaitTimeout
+   * is set, this is equivalent to wait(). Otherwise only one search attempt will be done.
+   * using four parameters 
+   *
+	 * @param <PSI> Pattern, String or Image
+   * @param target A search criteria
+   * @return If found, the element. null otherwise
+   * @throws FindFailed if the Find operation failed
+   */
+  public <PSI> Match find(PSI target,int startx,int starty,int weight,int height) throws FindFailed {
+    if (autoWaitTimeout > 0) {
+      return wait(target, autoWaitTimeout);
+    }
+    lastMatch = null;
+		String targetStr = target.toString();
+		if (target instanceof String) {
+			targetStr = targetStr.trim();
+		}
+    while (true) {
+      try {
+        log(3, "find: waiting 0 secs for %s to appear in %s", targetStr, this.toStringShort());
+        lastMatch = doFind(target, null);
+      } catch (IOException ex) {
+        if (ex instanceof IOException) {
+          if (handleFindFailedImageMissing(target)) {
+            continue;
+          }
+        }
+        throw new FindFailed(ex.getMessage());
+      }
+      if (lastMatch != null) {
+        Image img = getImage(target);
+        lastMatch.setImage(img);
+        if (img != null) {
+          img.setLastSeen(lastMatch.getRect(), lastMatch.getScore());
+        }
+	      log(lvl, "find: %s has appeared \nat %s", targetStr, lastMatch);
+        return lastMatch;
+      }
+	    log(3, "find: %s has not appeared [%d msec]", targetStr, lastFindTime);
+      if (!handleFindFailed(target)) {
+        return null;
+      }
+    }
+  }
 
   /**
    * finds all occurences of the given Pattern, String or Image in the region and returns an Iterator of Matches.
@@ -3070,11 +3116,38 @@ public class Region {
     }
     return null;
   }
+  
+  
+  
+  
+  protected <PSIMRL> Location getLocationFromTarget(PSIMRL target, int startx,int starty,int weight ,int height) throws FindFailed {
+	    if (target instanceof Pattern || target instanceof String || target instanceof Image) {
+	      Match m = find(target,startx,starty,weight,height);
+	      if (m != null) {
+	        if (isOtherScreen()) {
+	          return m.getTarget().setOtherScreen(scr);
+	        } else {
+	          return m.getTarget();
+	        }
+	      }
+	      return null;
+	    }
+	    if (target instanceof Match) {
+	      return ((Match) target).getTarget();
+	    }
+	    if (target instanceof Region) {
+	      return ((Region) target).getCenter();
+	    }
+	    if (target instanceof Location) {
+	      return new Location((Location) target);
+	    }
+	    return null;
+	  }
   //</editor-fold>
 
   //<editor-fold defaultstate="collapsed" desc="Observing">
 
-	  protected Observer getObserver() {
+	protected Observer getObserver() {
     if (regionObserver == null) {
       regionObserver = new Observer(this);
     }
@@ -3786,7 +3859,24 @@ public class Region {
     Location loc = getLocationFromTarget(target);
     return Mouse.move(loc, this);
   }
-
+  /**
+   * move the mouse pointer to the given target location<br> same as hover<br> Pattern or Filename - do a find before
+   * and use the match<br> Region - position at center<br> Match - position at match's targetOffset<br>
+   * Location - position at that point<br>
+   *
+   * @param <PFRML> Pattern, Filename, Text, Region, Match or Location
+   * @param target Pattern, Filename, Text, Region, Match or Location
+   * @param startx	target image position startx
+   * @param	starty  target image position starty
+   * @param	weight	target image weight
+   * @param height	target image height
+   * @return 1 if possible, 0 otherwise
+   * @throws FindFailed for Pattern or Filename
+   */
+  public <PFRML> int mouseMove(PFRML target,int startx,int starty,int weight ,int height) throws FindFailed {
+	    Location loc = getLocationFromTarget(target, startx, starty, weight , height);
+	    return Mouse.move(loc, this);
+	  }
 	/**
 	 * move the mouse from the current position to the offset position given by the parameters
 	 * @param xoff horizontal offset (&lt; 0 left, &gt; 0 right)
